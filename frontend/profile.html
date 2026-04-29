@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile – LocalConnect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/styles.css" />
+  <style>
+    .profile-layout { display: grid; grid-template-columns: 1fr 280px; gap: 2rem; padding: 2rem 0 4rem; align-items: start; }
+    .profile-hero { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); }
+    .profile-hero-inner { display: flex; gap: 1.75rem; align-items: flex-start; flex-wrap: wrap; }
+    .profile-info { flex: 1; }
+    .profile-name  { font-size: 1.9rem; font-weight: 800; color: var(--fg); margin-bottom: .3rem; }
+    .profile-role  { font-size: 1rem; color: var(--fg-muted); margin-bottom: .75rem; }
+    .profile-badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .9rem; }
+    .profile-meta-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.1rem; font-size: .875rem; color: var(--fg-muted); }
+    .profile-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+    .profile-side-card { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; box-shadow: var(--shadow-sm); margin-bottom: 1.25rem; }
+    .profile-side-card h4 { font-size: .95rem; font-weight: 700; margin-bottom: .9rem; }
+    .skill-tags { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .rate-display { font-size: 1.6rem; font-weight: 800; color: var(--accent-dark); font-family: 'Sora',sans-serif; }
+    .review-card { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem; margin-bottom: .75rem; }
+    .star-row { color: #f59e0b; letter-spacing: .05em; }
+    @media(max-width:1024px) { .profile-layout { grid-template-columns: 1fr; } }
+    @media(max-width:600px)  { .profile-hero-inner { flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div class="container" id="profileRoot" style="padding-top:2rem">
+    <p class="text-muted" style="padding:3rem 0;text-align:center">Loading profile…</p>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div id="editModal" class="modal-overlay hidden" onclick="LC.utils.closeModalIfBg(event,'editModal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Edit Profile</h3>
+        <button class="modal-close" onclick="LC.utils.closeModal('editModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label>Full Name</label><input type="text" id="epName" /></div>
+          <div class="form-group"><label>Location</label><input type="text" id="epLocation" placeholder="City, State" /></div>
+        </div>
+        <div class="form-group"><label>Phone</label><input type="text" id="epPhone" placeholder="+91 XXXXX XXXXX" /></div>
+        <div class="form-group"><label>Bio</label><textarea id="epBio" rows="4" placeholder="Tell people about yourself…"></textarea></div>
+        <div id="workerFields" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Hourly Rate (₹)</label>
+              <input type="number" id="epRate" placeholder="e.g. 500" />
+            </div>
+            <div class="form-group">
+              <label>Primary Category</label>
+              <select id="epCategory">
+                <option value="">Select category</option>
+                <option>Electrical</option><option>Plumbing</option><option>Cleaning</option>
+                <option>Handyman</option><option>Gardening</option><option>Tutoring</option>
+                <option>Cook/Maid</option><option>Pest Control</option><option>Carpentry</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="LC.utils.closeModal('editModal')">Cancel</button>
+          <button class="btn btn-primary" id="saveProfileBtn" onclick="saveProfile()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="../js/api.js"></script>
+  <script>
+    let viewUser = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      LC.nav.inject();
+      const id = new URLSearchParams(location.search).get('id');
+
+      if (id) {
+        viewUser = await LC.store.getUser(id);
+      } else {
+        if (!LC.store.currentUser) { window.location.href = 'auth.html'; return; }
+        // Reload fresh data from server (not just session)
+        viewUser = await LC.store.getUser(LC.store.currentUser.id);
+      }
+
+      if (!viewUser) {
+        document.getElementById('profileRoot').innerHTML =
+          '<p class="text-muted" style="text-align:center;padding:3rem 0">Profile not found.</p>';
+        return;
+      }
+      renderProfile();
+    });
+
+    async function renderProfile() {
+      const user    = viewUser;
+      const isOwn   = LC.store.currentUser && LC.store.currentUser.id === user.id;
+      const wp      = user.workerProfile;
+      const reviews = await LC.store.getReviews(user.id);
+      const avg     = reviews.length
+        ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+        : null;
+
+      document.title = `${user.fullName} – LocalConnect`;
+
+      // Fetch reviewer names in parallel
+      const reviewerIds = [...new Set(reviews.map(r => r.reviewerId))];
+      const reviewerMap = {};
+      await Promise.all(reviewerIds.map(async id => {
+        reviewerMap[id] = await LC.store.getUser(id);
+      }));
+
+      document.getElementById('profileRoot').innerHTML = `
+      <div class="profile-layout fade-in">
+        <div>
+          <div class="profile-hero">
+            <div class="profile-hero-inner">
+              <div class="profile-avatar-lg">${(user.fullName || 'U')[0].toUpperCase()}</div>
+              <div class="profile-info">
+                <div class="profile-name">${user.fullName}</div>
+                <div class="profile-role">${wp ? (wp.categories[0] || 'Service Provider') : 'Client'}</div>
+                <div class="profile-badges">
+                  ${wp?.verified ? '<span class="badge badge-success">✓ Verified</span>' : ''}
+                  <span class="badge badge-outline">${user.role === 'worker' ? '👷 Worker' : '🏠 Client'}</span>
+                </div>
+                <div class="profile-meta-row">
+                  ${user.location ? `<span>📍 ${user.location}</span>` : ''}
+                  ${avg ? `<span>⭐ ${avg} avg rating</span>` : ''}
+                  ${wp ? `<span>💼 ${wp.totalJobsCompleted} jobs done</span>` : ''}
+                </div>
+                <div class="profile-actions">
+                  ${isOwn
+                    ? `<button class="btn btn-primary" onclick="openEdit()">✏️ Edit Profile</button>
+                       <button class="btn btn-danger btn-sm" onclick="deleteAccount()">Delete Account</button>`
+                    : `<button class="btn btn-primary" onclick="LC.utils.showToast('Messaging coming soon!','info')">✉️ Contact</button>`}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tabs-bar">
+            <button class="tab-trigger active" onclick="switchTab('about')">About</button>
+            <button class="tab-trigger" onclick="switchTab('reviews')">Reviews (${reviews.length})</button>
+            ${isOwn ? '<button class="tab-trigger" onclick="switchTab(\'settings\')">Settings</button>' : ''}
+          </div>
+
+          <div id="tabAbout" class="tab-panel active">
+            ${user.bio
+              ? `<div class="card mb-4"><div class="card-header"><h3>About Me</h3></div><div class="card-body"><p style="color:var(--fg-muted);line-height:1.75">${user.bio}</p></div></div>`
+              : `<div class="card mb-4"><div class="card-body"><p class="text-muted">No bio added yet.</p></div></div>`}
+            ${!isOwn && (user.email || user.phone) ? `
+            <div class="card">
+              <div class="card-header"><h3>Contact</h3></div>
+              <div class="card-body">
+                ${user.email ? `<div class="mb-2"><a href="mailto:${user.email}" style="color:var(--primary)">📧 ${user.email}</a></div>` : ''}
+                ${user.phone ? `<div>📞 ${user.phone}</div>` : ''}
+              </div>
+            </div>` : ''}
+          </div>
+
+          <div id="tabReviews" class="tab-panel">
+            ${!reviews.length
+              ? `<div class="empty-state"><div class="empty-icon">⭐</div><p>No reviews yet.</p></div>`
+              : reviews.map(r => {
+                  const reviewer = reviewerMap[r.reviewerId];
+                  const stars    = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+                  return `<div class="review-card">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:.4rem">
+                      <strong>${reviewer?.fullName || 'Anonymous'}</strong>
+                      <span class="star-row">${stars}</span>
+                    </div>
+                    <p style="color:var(--fg-muted);font-size:.9rem">"${r.comment}"</p>
+                    <div style="font-size:.75rem;color:var(--fg-muted);margin-top:.4rem">${LC.utils.timeAgo(r.createdAt)}</div>
+                  </div>`;
+                }).join('')}
+          </div>
+
+          ${isOwn ? `
+          <div id="tabSettings" class="tab-panel">
+            <div class="card">
+              <div class="card-header"><h3>Account Settings</h3></div>
+              <div class="card-body">
+                <p class="text-muted mb-4">Manage your account information and preferences.</p>
+                <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+                  <button class="btn btn-outline" onclick="openEdit()">✏️ Edit Profile</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteAccount()">Delete Account</button>
+                </div>
+              </div>
+            </div>
+          </div>` : ''}
+        </div>
+
+        <!-- Sidebar -->
+        <div>
+          ${wp ? `
+          <div class="profile-side-card">
+            <h4>Skills &amp; Categories</h4>
+            <div class="skill-tags">
+              ${wp.categories.length
+                ? wp.categories.map(c => `<span class="skill-tag">${c}</span>`).join('')
+                : '<span class="text-muted" style="font-size:.85rem">No skills added</span>'}
+            </div>
+          </div>
+          <div class="profile-side-card">
+            <h4>Hourly Rate</h4>
+            <div class="rate-display">${wp.hourlyRate ? `₹${wp.hourlyRate}/hr` : 'Not set'}</div>
+          </div>
+          <div class="profile-side-card">
+            <h4>Work Stats</h4>
+            <div class="summary-row"><span>Jobs Completed</span><strong>${wp.totalJobsCompleted}</strong></div>
+            <div class="summary-row"><span>Rating</span><strong>${wp.ratingAverage ? `${wp.ratingAverage} ⭐` : 'N/A'}</strong></div>
+            <div class="summary-row"><span>Verified</span><strong>${wp.verified ? '✓ Yes' : 'No'}</strong></div>
+          </div>` : ''}
+          <div class="profile-side-card">
+            <h4>Member Info</h4>
+            <div class="summary-row"><span>Account Type</span><strong>${user.role === 'worker' ? 'Worker' : 'Client'}</strong></div>
+            <div class="summary-row"><span>Location</span><strong>${user.location || 'Not set'}</strong></div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-trigger').forEach(b => b.classList.remove('active'));
+      const panel = document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1));
+      if (panel) panel.classList.add('active');
+      document.querySelectorAll('.tab-trigger').forEach(b => {
+        if (b.getAttribute('onclick')?.includes(name)) b.classList.add('active');
+      });
+    }
+
+    function openEdit() {
+      const wp = viewUser.workerProfile;
+      document.getElementById('epName').value     = viewUser.fullName || '';
+      document.getElementById('epLocation').value = viewUser.location || '';
+      document.getElementById('epPhone').value    = viewUser.phone    || '';
+      document.getElementById('epBio').value      = viewUser.bio      || '';
+      if (wp) {
+        document.getElementById('workerFields').style.display = 'block';
+        document.getElementById('epRate').value     = wp.hourlyRate    || '';
+        document.getElementById('epCategory').value = wp.categories[0] || '';
+      } else {
+        document.getElementById('workerFields').style.display = 'none';
+      }
+      LC.utils.openModal('editModal');
+    }
+
+    async function saveProfile() {
+      const btn = document.getElementById('saveProfileBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      try {
+        const data = {
+          fullName : document.getElementById('epName').value.trim() || viewUser.fullName,
+          location : document.getElementById('epLocation').value.trim(),
+          phone    : document.getElementById('epPhone').value.trim(),
+          bio      : document.getElementById('epBio').value.trim()
+        };
+        if (viewUser.workerProfile) {
+          data.hourlyRate = parseFloat(document.getElementById('epRate').value) || null;
+          data.category   = document.getElementById('epCategory').value || '';
+        }
+        const updated = await LC.store.updateUser(viewUser.id, data);
+        viewUser = updated;
+        LC.utils.closeModal('editModal');
+        LC.utils.showToast('Profile updated! ✓', 'success');
+        renderProfile();
+      } catch (err) {
+        LC.utils.showToast('Error: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+      }
+    }
+
+    async function deleteAccount() {
+      if (!confirm('Delete your account? This cannot be undone.')) return;
+      try {
+        await LC.store.deleteUser(viewUser.id);
+        LC.utils.showToast('Account deleted.', 'info');
+        setTimeout(() => { window.location.href = '../index.html'; }, 800);
+      } catch (err) {
+        LC.utils.showToast('Error: ' + err.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

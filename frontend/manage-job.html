@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Job – LocalConnect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/styles.css" />
+  <style>
+    .manage-layout { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; padding: 2rem 0 4rem; align-items: start; }
+    .info-row { display: flex; justify-content: space-between; padding: .55rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+    .info-row:last-child { border-bottom: none; }
+    @media(max-width: 900px) { .manage-layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div class="container" style="padding-top:1.5rem">
+    <a href="dashboard-jg.html" class="btn btn-ghost">← Back to Dashboard</a>
+    <div id="manageContent"><p class="text-muted" style="padding:3rem 0;text-align:center">Loading…</p></div>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+  <script src="../js/api.js"></script>
+  <script>
+    let currentJobId;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (LC.utils.redirectIfNoAuth('job_giver')) return;
+      LC.nav.inject('dashboard');
+      currentJobId = new URLSearchParams(location.search).get('id');
+      renderManage(currentJobId);
+    });
+
+    async function renderManage(jobId) {
+      const el  = document.getElementById('manageContent');
+      el.innerHTML = '<p class="text-muted" style="padding:2rem 0;text-align:center">Loading…</p>';
+
+      const job = await LC.store.getJob(jobId);
+      if (!job || job.postedBy !== LC.store.currentUser.id) {
+        el.innerHTML = '<p class="text-muted" style="text-align:center;padding:3rem 0">Job not found or access denied.</p>';
+        return;
+      }
+
+      const apps = await LC.store.getApplications({ jobId: job.id });
+      document.title = `Manage: ${job.title} – LocalConnect`;
+
+      // Fetch all applicant profiles in parallel
+      const applicantIds = [...new Set(apps.map(a => a.applicantId))];
+      const applicantMap = {};
+      await Promise.all(applicantIds.map(async id => {
+        applicantMap[id] = await LC.store.getUser(id);
+      }));
+
+      const appRows = apps.map(app => {
+        const applicant = applicantMap[app.applicantId];
+        const wp        = applicant?.workerProfile;
+        const badge = {
+          accepted : '<span class="badge badge-success">Accepted</span>',
+          rejected : '<span class="badge badge-danger">Rejected</span>',
+          pending  : '<span class="badge badge-warning">Pending</span>'
+        }[app.status] || '';
+
+        return `<div class="application-item">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem">
+            <div>
+              <div class="app-title">👤 ${applicant?.fullName || 'Unknown'}</div>
+              ${wp ? `<div class="app-meta">⭐ ${wp.ratingAverage || 'N/A'} · ${wp.totalJobsCompleted} jobs done · ₹${wp.hourlyRate || 'N/A'}/hr ${wp.verified ? '· ✓ Verified' : ''}</div>` : ''}
+            </div>
+            ${badge}
+          </div>
+          ${app.coverMessage ? `<p style="font-size:.875rem;color:var(--fg-muted);margin:.4rem 0 .75rem;line-height:1.55">"${app.coverMessage}"</p>` : ''}
+          <div style="font-size:.75rem;color:var(--fg-muted);margin-bottom:.6rem">🕒 Applied ${LC.utils.timeAgo(app.appliedAt)}</div>
+          <div class="app-actions">
+            ${applicant ? `<a href="profile.html?id=${applicant.id}" class="btn btn-outline btn-sm">View Profile</a>` : ''}
+            ${app.status === 'pending' ? `
+              <button class="btn btn-primary btn-sm" onclick="updateApp('${app.id}','accepted','${job.id}')">Accept</button>
+              <button class="btn btn-danger btn-sm"  onclick="updateApp('${app.id}','rejected','${job.id}')">Reject</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+      el.innerHTML = `
+      <div class="manage-layout fade-in">
+        <div>
+          <div class="card" style="margin-bottom:1.5rem">
+            <div class="card-header">
+              <h3>${job.title}</h3>
+              <span class="badge ${job.status === 'open' ? 'badge-success' : 'badge-secondary'}">${job.status}</span>
+            </div>
+            <div class="card-body">
+              <p style="color:var(--fg-muted);margin-bottom:1rem;line-height:1.65">${job.description}</p>
+              <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.875rem;color:var(--fg-muted)">
+                <span>📂 ${job.category}</span>
+                <span>📍 ${job.location}</span>
+                <span>💰 ${LC.utils.formatBudget(job.budget)}</span>
+                <span>🕒 Posted ${LC.utils.timeAgo(job.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Applications (${apps.length})</h3></div>
+            <div class="card-body">
+              ${!apps.length
+                ? `<div class="empty-state"><div class="empty-icon">📭</div><p>No applications yet. Share your job to attract workers!</p></div>`
+                : appRows}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-header"><h3>Job Summary</h3></div>
+            <div class="card-body">
+              <div class="info-row"><span class="text-muted">Status</span><strong style="text-transform:capitalize">${job.status}</strong></div>
+              <div class="info-row"><span class="text-muted">Total Applications</span><strong>${apps.length}</strong></div>
+              <div class="info-row"><span class="text-muted">Pending</span><strong>${apps.filter(a=>a.status==='pending').length}</strong></div>
+              <div class="info-row"><span class="text-muted">Accepted</span><strong>${apps.filter(a=>a.status==='accepted').length}</strong></div>
+              <div class="info-row"><span class="text-muted">Budget</span><strong style="color:var(--success)">${LC.utils.formatBudget(job.budget)}</strong></div>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.6rem">
+            ${job.status === 'open'
+              ? `<button class="btn btn-danger btn-full" onclick="closeJob('${job.id}')">Close This Job</button>`
+              : `<span class="badge badge-secondary" style="text-align:center;padding:.6rem">Job is closed</span>`}
+            <a href="job-detail.html?id=${job.id}" class="btn btn-outline btn-full">View Public Listing</a>
+            <a href="dashboard-jg.html" class="btn btn-ghost btn-full">Back to Dashboard</a>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    async function updateApp(appId, status, jobId) {
+      try {
+        await LC.store.setApplicationStatus(appId, status);
+        LC.utils.showToast(
+          status === 'accepted' ? 'Application accepted! 🎉' : 'Application rejected.',
+          status === 'accepted' ? 'success' : 'info'
+        );
+        renderManage(jobId);
+      } catch (err) {
+        LC.utils.showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function closeJob(jobId) {
+      if (!confirm('Close this job? Workers will no longer be able to apply.')) return;
+      try {
+        await LC.store.setJobStatus(jobId, 'closed');
+        LC.utils.showToast('Job closed.', 'info');
+        renderManage(jobId);
+      } catch (err) {
+        LC.utils.showToast('Error: ' + err.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

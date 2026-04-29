@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalConnect – Trusted Local Services</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    .hero {
+      position: relative;
+      min-height: 90vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background: var(--gradient-hero);
+    }
+    .hero-bg::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E") repeat;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 2rem 1.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.3);
+      color: #fff;
+      padding: .4rem 1.1rem;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      backdrop-filter: blur(8px);
+    }
+    .hero-title {
+      font-size: clamp(2.2rem, 5vw, 4rem);
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 1.2rem;
+      line-height: 1.1;
+    }
+    .hero-title .highlight { color: var(--accent-light); }
+    .hero-sub {
+      font-size: 1.15rem;
+      color: rgba(255,255,255,.85);
+      margin-bottom: 2.2rem;
+      max-width: 580px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .hero-btns { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3rem; }
+    .hero-stats {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      background: rgba(255,255,255,.1);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,.2);
+      padding: 1.2rem 2rem;
+      border-radius: var(--radius-lg);
+    }
+    .hstat { text-align: center; }
+    .hstat-num   { display: block; font-size: 1.6rem; font-weight: 800; color: #fff; font-family: 'Sora',sans-serif; }
+    .hstat-label { font-size: .78rem; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: .05em; }
+    .hstat-sep   { width: 1px; height: 40px; background: rgba(255,255,255,.3); }
+
+    .section      { padding: 5rem 0; }
+    .section-muted{ background: var(--bg-muted); }
+    .section-header{ text-align: center; margin-bottom: 3rem; }
+    .section-title { font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 800; color: var(--fg); margin-bottom: .75rem; }
+    .section-sub   { font-size: 1.05rem; color: var(--fg-muted); max-width: 600px; margin: 0 auto; }
+
+    .categories-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+    .category-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1rem;
+      background: var(--gradient-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-align: center;
+      transition: var(--transition);
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .category-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); border-color: var(--primary-light); }
+    .cat-icon { font-size: 2.2rem; margin-bottom: .6rem; }
+    .cat-name { font-weight: 700; font-size: .95rem; color: var(--fg); margin-bottom: .2rem; }
+    .cat-jobs { font-size: .8rem; color: var(--fg-muted); }
+
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 1.5rem; }
+    .feature-card {
+      padding: 2rem;
+      background: var(--gradient-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      transition: var(--transition);
+      box-shadow: var(--shadow-sm);
+    }
+    .feature-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); }
+    .feat-icon {
+      width: 64px; height: 64px;
+      font-size: 1.8rem;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.2rem;
+    }
+    .feat-blue  { background: rgba(37,99,235,.1); }
+    .feat-green { background: rgba(22,163,74,.1); }
+    .feat-orange{ background: rgba(251,146,60,.12); }
+    .feature-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: .6rem; }
+    .feature-card p  { color: var(--fg-muted); font-size: .95rem; line-height: 1.6; }
+
+    .benefits-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; }
+    .benefits-list { list-style: none; margin: 1.5rem 0 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+    .benefits-list li { font-size: .95rem; font-weight: 500; }
+    .benefits-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2.5rem; box-shadow: var(--shadow-md); text-align: center; }
+    .benefits-card h3 { font-size: 1.3rem; font-weight: 800; margin-bottom: 2rem; }
+    .trust-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; }
+    .tstat-num   { font-size: 2rem; font-weight: 800; font-family: 'Sora',sans-serif; }
+    .tstat-num.c-primary  { color: var(--primary); }
+    .tstat-num.c-secondary{ color: var(--secondary); }
+    .tstat-num.c-accent   { color: var(--accent-dark); }
+    .tstat-label { font-size: .8rem; color: var(--fg-muted); margin-top: .2rem; }
+
+    .cta-section { background: var(--gradient-hero); padding: 5rem 0; text-align: center; color: #fff; }
+    .cta-section h2 { font-size: 2.2rem; font-weight: 800; margin-bottom: .75rem; }
+    .cta-section p  { font-size: 1.1rem; opacity: .85; margin-bottom: 2rem; }
+    .cta-btns { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+    @media(max-width:768px){
+      .hero-stats { flex-direction: column; gap: 1rem; }
+      .hstat-sep  { display: none; }
+      .benefits-layout { grid-template-columns: 1fr; }
+      .benefits-list   { grid-template-columns: 1fr; }
+      .categories-grid { grid-template-columns: repeat(3,1fr); }
+      .hero-btns, .cta-btns { flex-direction: column; align-items: center; }
+    }
+    @media(max-width:480px){
+      .categories-grid { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="navbar-placeholder"></div>
+
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content fade-in">
+      <div class="hero-badge">India's Most Trusted Local Platform</div>
+      <h1 class="hero-title">
+        Find Trusted<br/>
+        <span class="highlight">Local Services</span><br/>
+        Near You
+      </h1>
+      <p class="hero-sub">Connect with verified electricians, plumbers, tutors, cooks, and more — all within your neighbourhood.</p>
+      <div class="hero-btns">
+        <a href="pages/auth.html?tab=signup&role=job_giver" class="btn btn-accent btn-xl">I Need a Service →</a>
+        <a href="pages/auth.html?tab=signup&role=worker"    class="btn btn-outline-white btn-xl">I Offer a Service →</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hstat"><span class="hstat-num">15K+</span><span class="hstat-label">Service Providers</span></div>
+        <div class="hstat-sep"></div>
+        <div class="hstat"><span class="hstat-num">50K+</span><span class="hstat-label">Services Completed</span></div>
+        <div class="hstat-sep"></div>
+        <div class="hstat"><span class="hstat-num">4.8⭐</span><span class="hstat-label">Average Rating</span></div>
+      </div>
+    </div>
+  </section>
+
+ 
+  <section class="section section-muted">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Popular Household Services</h2>
+        <p class="section-sub">Find trusted local service providers for all your household needs</p>
+      </div>
+      <div class="categories-grid">
+        <a href="pages/browse.html?cat=Electrical"  class="category-card"><div class="cat-icon">⚡</div><div class="cat-name">Electrician</div><div class="cat-jobs">120+ jobs</div></a>
+        <a href="pages/browse.html?cat=Plumbing"    class="category-card"><div class="cat-icon">🔧</div><div class="cat-name">Plumber</div><div class="cat-jobs">85+ jobs</div></a>
+        <a href="pages/browse.html?cat=Handyman"    class="category-card"><div class="cat-icon">🪚</div><div class="cat-name">Carpenter</div><div class="cat-jobs">95+ jobs</div></a>
+        <a href="pages/browse.html?cat=Cleaning"    class="category-card"><div class="cat-icon">🧹</div><div class="cat-name">House Cleaning</div><div class="cat-jobs">200+ jobs</div></a>
+        <a href="pages/browse.html?cat=Tutoring"    class="category-card"><div class="cat-icon">📚</div><div class="cat-name">Home Tutor</div><div class="cat-jobs">150+ jobs</div></a>
+        <a href="pages/browse.html?cat=Cook%2FMaid" class="category-card"><div class="cat-icon">🍳</div><div class="cat-name">Cook / Maid</div><div class="cat-jobs">80+ jobs</div></a>
+      </div>
+    </div>
+  </section>
+
+  
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Why Choose Local Connect?</h2>
+        <p class="section-sub">India's most trusted platform for household services with verified local workers</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feat-icon feat-blue">👥</div>
+          <h3>Trusted Local Workers</h3>
+          <p>Connect with verified household service providers in your neighbourhood — electricians, plumbers, tutors, and more.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon feat-green">🛡️</div>
+          <h3>Safe &amp; Secure</h3>
+          <p>All workers are background verified. Secure payments in Indian Rupees with full customer protection guaranteed.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feat-icon feat-orange">⭐</div>
+          <h3>Quality Guaranteed</h3>
+          <p>Rating system and customer reviews ensure you get reliable, quality household services every single time.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-muted">
+    <div class="container">
+      <div class="benefits-layout">
+        <div>
+          <h2 class="section-title" style="text-align:left">Safe, reliable household services</h2>
+          <p class="section-sub" style="text-align:left">Get peace of mind with our comprehensive verification process and customer protection for all household services.</p>
+          <ul class="benefits-list">
+            <li>✅ Verified worker profiles with ID proof</li>
+            <li>✅ Customer support in Hindi &amp; English</li>
+            <li>✅ Secure payment in ₹ (Rupees)</li>
+            <li>✅ Same-day service availability</li>
+            <li>✅ Customer protection guarantee</li>
+            <li>✅ Mobile-friendly platform</li>
+          </ul>
+          <a href="pages/browse.html" class="btn btn-accent btn-lg">Find Services Now →</a>
+        </div>
+        <div class="benefits-card">
+          <h3>Trusted by households across India</h3>
+          <div class="trust-stats">
+            <div class="tstat"><div class="tstat-num c-primary">15K+</div><div class="tstat-label">Service Providers</div></div>
+            <div class="tstat"><div class="tstat-num c-secondary">50K+</div><div class="tstat-label">Jobs Done</div></div>
+            <div class="tstat"><div class="tstat-num c-accent">4.8⭐</div><div class="tstat-label">Avg Rating</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+  <section class="cta-section">
+    <div class="container">
+      <h2>Ready to get started?</h2>
+      <p>Join Local Connect today and get trusted household services at your doorstep.</p>
+      <div class="cta-btns">
+        <a href="pages/auth.html?tab=signup" class="btn btn-accent btn-xl">Get Started</a>
+        <a href="pages/browse.html"          class="btn btn-outline-white btn-xl">Browse Services</a>
+      </div>
+    </div>
+  </section>
+
+ 
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="nav-logo">
+            <span class="logo-icon">⚡</span>
+            <span class="logo-text"><span class="logo-local">Local</span><span class="logo-connect">Connect</span></span>
+          </a>
+          <p>India's trusted platform for household services. Connecting you with verified local providers for all your home needs.</p>
+        </div>
+        <div class="footer-links">
+          <h4>For Customers</h4>
+          <a href="pages/browse.html">Find Services</a>
+          <a href="pages/auth.html?tab=signup&role=job_giver">Book a Service</a>
+          <a href="#">Help Center</a>
+        </div>
+        <div class="footer-links">
+          <h4>For Service Providers</h4>
+          <a href="pages/auth.html?tab=signup&role=worker">Join as Provider</a>
+          <a href="pages/browse.html">Find Work</a>
+          <a href="#">Support</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2024 Local Connect. All rights reserved. Made in India 🇮🇳</p>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/api.js"></script>
+  <script>
+   
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = LC.store.currentUser;
+      const dashUrl = user ? (user.role === 'job_giver' ? 'pages/dashboard-jg.html' : 'pages/dashboard-worker.html') : '#';
+      const guestLinks = `
+        <a href="pages/browse.html" class="nav-link">Browse Services</a>
+        <div class="nav-auth">
+          <a href="pages/auth.html" class="btn btn-ghost">Log In</a>
+          <a href="pages/auth.html?tab=signup" class="btn btn-primary">Sign Up</a>
+        </div>`;
+      const userLinks = user ? `
+        <a href="pages/browse.html" class="nav-link">Browse Services</a>
+        <a href="${dashUrl}" class="nav-link">Dashboard</a>
+        <div class="avatar-wrapper" onclick="LC.nav.toggleUserMenu()">
+          <div class="avatar">${(user.fullName||'U')[0].toUpperCase()}</div>
+          <div class="user-dropdown hidden" id="userDropdown">
+            <a href="pages/profile.html">My Profile</a>
+            <a href="#" onclick="LC.nav.logout(event)">Log Out</a>
+          </div>
+        </div>` : guestLinks;
+
+      const mobileLinks = user ? `
+        <a href="pages/browse.html">Browse Services</a>
+        <a href="${dashUrl}">Dashboard</a>
+        <a href="pages/profile.html">Profile</a>
+        <a href="#" onclick="LC.nav.logout(event)">Log Out</a>` : `
+        <a href="pages/browse.html">Browse Services</a>
+        <a href="pages/auth.html">Log In</a>
+        <a href="pages/auth.html?tab=signup">Sign Up</a>`;
+
+      document.getElementById('navbar-placeholder').outerHTML = `
+      <nav class="navbar">
+        <div class="nav-container">
+          <a href="index.html" class="nav-logo">
+            <span class="logo-icon">⚡</span>
+            <span class="logo-text"><span class="logo-local">Local</span><span class="logo-connect">Connect</span></span>
+          </a>
+          <div class="nav-links">${userLinks}</div>
+          <button class="hamburger" onclick="LC.nav.toggleMobile()">&#9776;</button>
+        </div>
+        <div class="mobile-menu hidden" id="mobileMenu">${mobileLinks}</div>
+      </nav>`;
+    });
+  </script>
+</body>
+</html>

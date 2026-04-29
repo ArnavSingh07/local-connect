@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client Dashboard – LocalConnect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/styles.css" />
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+  <div class="page-header">
+    <div class="container dash-header">
+      <div>
+        <h1>Dashboard</h1>
+        <p>Manage your job postings and review applications.</p>
+      </div>
+      <button class="btn btn-outline-white" onclick="LC.utils.openModal('postJobModal')">+ Post New Job</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="stats-grid" id="statsGrid">
+      <p class="text-muted">Loading stats…</p>
+    </div>
+
+    <div class="dash-layout">
+      <div class="dash-main">
+        <div class="card mb-6">
+          <div class="card-header">
+            <h3>Applications Received</h3>
+            <span class="badge badge-secondary" id="appsBadge">0</span>
+          </div>
+          <div class="card-body" id="applicationsReceived">
+            <p class="text-muted">Loading…</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>My Posted Jobs</h3>
+            <span class="badge badge-secondary" id="jobsBadge">0</span>
+          </div>
+          <div class="card-body" id="postedJobsList">
+            <p class="text-muted">Loading…</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="dash-side">
+        <div class="card tip-card">
+          <div class="card-body">
+            <h4>🚀 Boost Your Jobs</h4>
+            <p>Increase visibility and get more qualified applications for your postings.</p>
+            <button class="btn btn-outline-white btn-sm">Learn More</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Quick Actions</h3></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:.6rem">
+            <button class="btn btn-primary btn-full" onclick="LC.utils.openModal('postJobModal')">+ Post New Job</button>
+            <a href="browse.html" class="btn btn-outline btn-full">Browse Workers</a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Post Job Modal -->
+  <div id="postJobModal" class="modal-overlay hidden" onclick="LC.utils.closeModalIfBg(event,'postJobModal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Post a New Job</h3>
+        <button class="modal-close" onclick="LC.utils.closeModal('postJobModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Job Title *</label>
+            <input type="text" id="pjTitle" placeholder="e.g. House Cleaning" />
+          </div>
+          <div class="form-group">
+            <label>Category *</label>
+            <select id="pjCategory">
+              <option value="">Select category</option>
+              <option>Cleaning</option><option>Plumbing</option><option>Electrical</option>
+              <option>Handyman</option><option>Gardening</option><option>Tutoring</option>
+              <option>Cook/Maid</option><option>Pest Control</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description *</label>
+          <textarea id="pjDescription" rows="4" placeholder="Describe the job requirements…"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Location *</label>
+            <input type="text" id="pjLocation" placeholder="e.g. Meerut, UP" />
+          </div>
+          <div class="form-group">
+            <label>Budget (₹) *</label>
+            <input type="number" id="pjBudget" placeholder="Enter amount" min="1" />
+          </div>
+        </div>
+        <div id="postJobError" class="form-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="LC.utils.closeModal('postJobModal')">Cancel</button>
+          <button class="btn btn-primary" id="postJobBtn" onclick="handlePostJob()">Post Job</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="../js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (LC.utils.redirectIfNoAuth('job_giver')) return;
+      LC.nav.inject('dashboard');
+      renderPage();
+    });
+
+    async function renderPage() {
+      const user = LC.store.currentUser;
+
+      // FIX: Pehle sirf is user ke jobs fetch karo
+      const myJobs = await LC.store.getJobs({ postedBy: user.id });
+
+      // FIX: Phir sirf un jobs ki applications fetch karo (parallel)
+      let allApps = [];
+      if (myJobs.length) {
+        const appPromises = myJobs.map(j => LC.store.getApplications({ jobId: j.id }));
+        const appArrays   = await Promise.all(appPromises);
+        allApps = appArrays.flat();
+      }
+
+      const active   = myJobs.filter(j => j.status === 'open').length;
+      const pending  = allApps.filter(a => a.status === 'pending').length;
+      const accepted = allApps.filter(a => a.status === 'accepted').length;
+
+      // Stats
+      document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-info"><div class="stat-label">Active Jobs</div><div class="stat-value">${active}</div><div class="stat-desc">Currently posted</div></div>
+          <div class="stat-icon">💼</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-info"><div class="stat-label">Total Applications</div><div class="stat-value">${allApps.length}</div><div class="stat-desc">Across all jobs</div></div>
+          <div class="stat-icon">👥</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-info"><div class="stat-label">Pending Review</div><div class="stat-value">${pending}</div><div class="stat-desc">Need your response</div></div>
+          <div class="stat-icon">👁️</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-info"><div class="stat-label">Accepted</div><div class="stat-value">${accepted}</div><div class="stat-desc">Applications approved</div></div>
+          <div class="stat-icon">📈</div>
+        </div>`;
+
+      document.getElementById('appsBadge').textContent = allApps.length;
+      document.getElementById('jobsBadge').textContent = myJobs.length;
+
+      // Applications section
+      const appEl = document.getElementById('applicationsReceived');
+      if (!allApps.length) {
+        appEl.innerHTML = `<div class="empty-state">
+          <div class="empty-icon">📭</div>
+          <p>No applications yet. Post a job to start receiving applications!</p>
+          <button class="btn btn-primary" onclick="LC.utils.openModal('postJobModal')">Post a Job</button>
+        </div>`;
+      } else {
+        // Fetch applicant profiles in parallel
+        const applicantIds = [...new Set(allApps.map(a => a.applicantId))];
+        const applicantMap = {};
+        await Promise.all(applicantIds.map(async id => {
+          applicantMap[id] = await LC.store.getUser(id);
+        }));
+
+        const jobMap = {};
+        myJobs.forEach(j => { jobMap[j.id] = j; });
+
+        appEl.innerHTML = allApps.map(app => {
+          const job       = jobMap[app.jobId];
+          const applicant = applicantMap[app.applicantId];
+          const wp        = applicant?.workerProfile;
+          const badge     = {
+            accepted : '<span class="badge badge-success">Accepted</span>',
+            rejected : '<span class="badge badge-danger">Rejected</span>',
+            pending  : '<span class="badge badge-warning">Pending</span>'
+          }[app.status] || '';
+
+          return `<div class="application-item">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem">
+              <div>
+                <div class="app-title">👤 ${applicant?.fullName || 'Unknown'}
+                  ${wp?.verified ? '<span class="badge badge-success" style="font-size:.7rem">✓ Verified</span>' : ''}
+                </div>
+                <div class="app-meta">For: <a href="job-detail.html?id=${job?.id}" style="color:var(--primary)">${job?.title || 'Unknown Job'}</a></div>
+                ${wp ? `<div class="app-meta">⭐ ${wp.ratingAverage || 'N/A'} · ${wp.totalJobsCompleted} jobs · ₹${wp.hourlyRate || 'N/A'}/hr</div>` : ''}
+              </div>
+              ${badge}
+            </div>
+            ${app.coverMessage ? `<p style="font-size:.875rem;color:var(--fg-muted);margin:.4rem 0 .75rem;line-height:1.55">"${app.coverMessage.slice(0,160)}${app.coverMessage.length > 160 ? '…' : ''}"</p>` : ''}
+            <div style="font-size:.75rem;color:var(--fg-muted);margin-bottom:.65rem">🕒 Applied ${LC.utils.timeAgo(app.appliedAt)}</div>
+            ${app.status === 'pending' ? `
+            <div class="app-actions">
+              <button class="btn btn-primary btn-sm" onclick="updateStatus('${app.id}','accepted')">Accept</button>
+              <button class="btn btn-danger btn-sm"  onclick="updateStatus('${app.id}','rejected')">Reject</button>
+              <a href="profile.html?id=${applicant?.id}" class="btn btn-outline btn-sm">View Profile</a>
+            </div>` : ''}
+          </div>`;
+        }).join('');
+      }
+
+      // Posted jobs section
+      const jobEl = document.getElementById('postedJobsList');
+      if (!myJobs.length) {
+        jobEl.innerHTML = `<div class="empty-state">
+          <div class="empty-icon">💼</div>
+          <p>No jobs posted yet.</p>
+          <button class="btn btn-primary" onclick="LC.utils.openModal('postJobModal')">Post Your First Job</button>
+        </div>`;
+      } else {
+        jobEl.innerHTML = myJobs.map(job => {
+          const jobApps = allApps.filter(a => a.jobId === job.id);
+          return `<div class="application-item">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem">
+              <div>
+                <div class="app-title">${job.title}</div>
+                <div class="app-meta">${job.category} · ${job.location} · ${LC.utils.formatBudget(job.budget)}</div>
+                <div class="app-meta">${jobApps.length} application${jobApps.length !== 1 ? 's' : ''} · Posted ${LC.utils.timeAgo(job.createdAt)}</div>
+              </div>
+              <span class="badge ${job.status === 'open' ? 'badge-success' : 'badge-secondary'}">${job.status}</span>
+            </div>
+            <div class="app-actions" style="margin-top:.6rem">
+              <a href="job-detail.html?id=${job.id}" class="btn btn-outline btn-sm">View</a>
+              <a href="manage-job.html?id=${job.id}" class="btn btn-secondary btn-sm">Manage</a>
+              ${job.status === 'open' ? `<button class="btn btn-ghost btn-sm" onclick="closeJob('${job.id}')">Close Job</button>` : ''}
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    async function updateStatus(appId, status) {
+      try {
+        await LC.store.setApplicationStatus(appId, status);
+        LC.utils.showToast(
+          status === 'accepted' ? 'Application accepted! 🎉' : 'Application rejected.',
+          status === 'accepted' ? 'success' : 'info'
+        );
+        renderPage();
+      } catch (err) {
+        LC.utils.showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function closeJob(jobId) {
+      if (!confirm('Close this job? Workers will no longer be able to apply.')) return;
+      try {
+        await LC.store.setJobStatus(jobId, 'closed');
+        LC.utils.showToast('Job closed.', 'info');
+        renderPage();
+      } catch (err) {
+        LC.utils.showToast('Error: ' + err.message, 'error');
+      }
+    }
+
+    async function handlePostJob() {
+      LC.utils.hideError('postJobError');
+      const title       = document.getElementById('pjTitle').value.trim();
+      const description = document.getElementById('pjDescription').value.trim();
+      const category    = document.getElementById('pjCategory').value;
+      const location    = document.getElementById('pjLocation').value.trim();
+      const budget      = parseFloat(document.getElementById('pjBudget').value);
+
+      if (!title || !description || !category || !location || !budget) {
+        LC.utils.showError('postJobError', 'Please fill in all required fields.');
+        return;
+      }
+
+      const btn = document.getElementById('postJobBtn');
+      btn.disabled = true;
+      btn.textContent = 'Posting…';
+
+      try {
+        await LC.store.postJob({
+          title, description, category, location, budget,
+          postedBy: LC.store.currentUser.id
+        });
+        LC.utils.closeModal('postJobModal');
+        LC.utils.showToast('Job posted successfully! 🎉', 'success');
+        ['pjTitle', 'pjDescription', 'pjLocation', 'pjBudget'].forEach(id => {
+          document.getElementById(id).value = '';
+        });
+        document.getElementById('pjCategory').value = '';
+        renderPage();
+      } catch (err) {
+        LC.utils.showError('postJobError', err.message || 'Failed to post job.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Post Job';
+      }
+    }
+  </script>
+</body>
+</html>

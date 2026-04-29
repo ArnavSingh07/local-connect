@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Detail – LocalConnect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/styles.css" />
+  <style>
+    .detail-layout { display: grid; grid-template-columns: 1fr 320px; gap: 2rem; margin-top: 1.5rem; padding-bottom: 4rem; }
+    .jd-card { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .jd-card-header { padding: 1.75rem 2rem; border-bottom: 1px solid var(--border); }
+    .jd-title  { font-size: 1.65rem; font-weight: 800; color: var(--fg); margin-bottom: .75rem; }
+    .jd-meta   { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: .875rem; color: var(--fg-muted); margin-bottom: 1rem; }
+    .jd-budget-row { display: flex; align-items: center; justify-content: space-between; padding-top: 1rem; border-top: 1px solid var(--border); margin-top: .75rem; }
+    .jd-budget { font-size: 1.4rem; font-weight: 800; color: var(--success); }
+    .jd-body   { padding: 1.75rem 2rem; }
+    .jd-section { margin-bottom: 1.75rem; }
+    .jd-section h3 { font-size: 1rem; font-weight: 700; margin-bottom: .75rem; }
+    .jd-desc   { color: var(--fg-muted); line-height: 1.75; white-space: pre-line; }
+    .jd-emoji-img { width:100%; height:220px; background:linear-gradient(135deg,#e2e8f0,#cbd5e1); display:flex; align-items:center; justify-content:center; font-size:6rem; border-radius:var(--radius-sm); margin-bottom:1.25rem; }
+    .jd-side   { display: flex; flex-direction: column; gap: 1.25rem; }
+    .client-inner { padding: 1.25rem 1.5rem; }
+    .client-avatar { width:52px;height:52px;border-radius:50%;background:var(--gradient-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700; }
+    .activity-row { display:flex;justify-content:space-between;font-size:.875rem;padding:.45rem 0;border-bottom:1px solid var(--border); }
+    .activity-row:last-child { border-bottom:none; }
+    @media(max-width:1024px) { .detail-layout { grid-template-columns:1fr; } .jd-side { order:-1; flex-direction:row; flex-wrap:wrap; } .jd-side .card { flex:1 1 240px; } }
+    @media(max-width:600px)  { .jd-card-header { padding:1.25rem; } .jd-body { padding:1.25rem; } }
+  </style>
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div class="container" style="padding-top:1.5rem">
+    <a href="browse.html" class="btn btn-ghost">← Back to Jobs</a>
+    <div id="detailContent"><p class="text-muted" style="padding:3rem 0;text-align:center">Loading job…</p></div>
+  </div>
+
+  <!-- Apply Modal -->
+  <div id="applyModal" class="modal-overlay hidden" onclick="LC.utils.closeModalIfBg(event,'applyModal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Apply for this Job</h3>
+        <button class="modal-close" onclick="LC.utils.closeModal('applyModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="applyJobInfo" style="background:var(--bg-muted);border-radius:var(--radius-sm);padding:.9rem 1rem;margin-bottom:1rem;font-size:.875rem"></div>
+        <div class="form-group">
+          <label>Your Proposal *</label>
+          <textarea id="applyProposal" rows="7" placeholder="Explain why you're the perfect fit…"></textarea>
+        </div>
+        <div id="applyError" class="form-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="LC.utils.closeModal('applyModal')">Cancel</button>
+          <button class="btn btn-primary" onclick="LC.utils.submitApply()">Submit Application</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="../js/api.js"></script>
+  <script>
+    let currentJobId;
+    window.onApplySuccess = () => renderDetail(currentJobId);
+
+    document.addEventListener('DOMContentLoaded', () => {
+      LC.nav.inject('browse');
+      currentJobId = new URLSearchParams(location.search).get('id');
+      if (!currentJobId) {
+        document.getElementById('detailContent').innerHTML =
+          '<p class="text-muted" style="padding:3rem 0;text-align:center">Job ID missing.</p>';
+        return;
+      }
+      renderDetail(currentJobId);
+    });
+
+    async function renderDetail(jobId) {
+      const el = document.getElementById('detailContent');
+      el.innerHTML = '<p class="text-muted" style="padding:3rem 0;text-align:center">Loading…</p>';
+
+      const job = await LC.store.getJob(jobId);
+      if (!job) {
+        el.innerHTML = '<p class="text-muted" style="padding:3rem 0;text-align:center">Job not found.</p>';
+        return;
+      }
+
+      const user = LC.store.currentUser;
+      const [poster, myApps, allJobs] = await Promise.all([
+        LC.store.getUser(job.postedBy),
+        user ? LC.store.getApplications({ applicantId: user.id }) : Promise.resolve([]),
+        LC.store.getJobs({ category: job.category, status: 'open' })
+      ]);
+
+      const alreadyApplied = myApps.some(a => a.jobId === job.id);
+      const isOwner        = user && job.postedBy === user.id;
+      const similar        = allJobs.filter(j => j.id !== job.id).slice(0, 3);
+
+      let applyBtn = '';
+      if (isOwner) {
+        applyBtn = `<a href="manage-job.html?id=${job.id}" class="btn btn-secondary btn-lg">Manage Job</a>`;
+      } else if (!user) {
+        applyBtn = `<a href="auth.html" class="btn btn-primary btn-lg">Log In to Apply</a>`;
+      } else if (user.role === 'worker') {
+        applyBtn = alreadyApplied
+          ? '<span class="badge badge-success" style="padding:.55rem 1.1rem;font-size:.9rem">✓ Applied</span>'
+          : `<button class="btn btn-primary btn-lg" onclick="LC.utils.openApplyModal('${job.id}')">✉️ Apply Now</button>`;
+      }
+
+      el.innerHTML = `
+      <div class="detail-layout fade-in">
+        <div>
+          <div class="jd-card">
+            <div class="jd-card-header">
+              <h1 class="jd-title">${job.title}</h1>
+              <div class="jd-meta">
+                <span>🕒 Posted ${LC.utils.timeAgo(job.createdAt)}</span>
+                <span>📍 ${job.location}</span>
+                <span>👥 ${job.applications.length} applicant${job.applications.length !== 1 ? 's' : ''}</span>
+              </div>
+              <span class="badge badge-accent">${job.category}</span>
+              <div class="jd-budget-row">
+                <div class="jd-budget">${LC.utils.formatBudget(job.budget)}</div>
+                ${applyBtn}
+              </div>
+            </div>
+            <div class="jd-body">
+              <div class="jd-emoji-img">${job.imageEmoji}</div>
+              <div class="jd-section">
+                <h3>Job Description</h3>
+                <div class="jd-desc">${job.description}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="jd-side">
+          <div class="card">
+            <div class="card-header"><h3>About the Client</h3></div>
+            <div class="client-inner">
+              <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.9rem">
+                <div class="client-avatar">${(poster?.fullName || '?')[0].toUpperCase()}</div>
+                <div>
+                  <div style="font-weight:700">${poster?.fullName || 'Unknown'}</div>
+                  <div style="font-size:.8rem;color:var(--fg-muted)">${poster?.location || 'India'}</div>
+                </div>
+              </div>
+              ${poster?.bio ? `<p style="font-size:.875rem;color:var(--fg-muted);margin-bottom:.9rem">${poster.bio}</p>` : ''}
+              <a href="profile.html?id=${job.postedBy}" class="btn btn-outline btn-full">View Client Profile</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Job Activity</h3></div>
+            <div class="card-body">
+              <div class="activity-row"><span class="text-muted">Applications</span><strong>${job.applications.length}</strong></div>
+              <div class="activity-row"><span class="text-muted">Status</span><strong style="text-transform:capitalize">${job.status}</strong></div>
+              <div class="activity-row"><span class="text-muted">Budget</span><strong style="color:var(--success)">${LC.utils.formatBudget(job.budget)}</strong></div>
+            </div>
+          </div>
+
+          ${similar.length ? `
+          <div class="card">
+            <div class="card-header"><h3>Similar Jobs</h3></div>
+            <div class="card-body">
+              ${similar.map(sj => `
+                <div style="padding:.5rem 0;border-bottom:1px solid var(--border)">
+                  <a href="job-detail.html?id=${sj.id}" style="font-weight:600;font-size:.875rem;color:var(--fg);display:block;margin-bottom:.3rem">${sj.title}</a>
+                  <div style="display:flex;justify-content:space-between;font-size:.78rem">
+                    <span class="badge badge-accent" style="font-size:.7rem">${sj.category}</span>
+                    <span style="color:var(--success);font-weight:700">${LC.utils.formatBudget(sj.budget)}</span>
+                  </div>
+                </div>`).join('')}
+              <a href="browse.html" class="btn btn-outline btn-full" style="margin-top:.75rem">View All Jobs</a>
+            </div>
+          </div>` : ''}
+        </div>
+      </div>`;
+    }
+  </script>
+</body>
+</html>

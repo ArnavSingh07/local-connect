@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browse Jobs – LocalConnect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/styles.css" />
+  <style>
+    .browse-layout { display: grid; grid-template-columns: 270px 1fr; gap: 2rem; padding: 2rem 0 4rem; align-items: start; }
+    .filter-sidebar { position: sticky; top: 84px; }
+    .filter-card { background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow-sm); }
+    .filter-title { font-size: 1rem; font-weight: 700; margin-bottom: 1.2rem; }
+    .jobs-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: .75rem; }
+    .jobs-count   { color: var(--fg-muted); font-size: .9rem; }
+    .sort-bar     { display: flex; align-items: center; gap: .5rem; font-size: .9rem; }
+    .sort-bar label { color: var(--fg-muted); font-size: .85rem; }
+    .sort-bar select { width: auto; padding: .4rem .8rem; }
+    .jobs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1.25rem; }
+    @media(max-width: 768px) {
+      .browse-layout { grid-template-columns: 1fr; }
+      .filter-sidebar { position: static; }
+      .jobs-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div class="page-header">
+    <div class="container">
+      <h1>Browse Jobs</h1>
+      <p>Discover service opportunities that match your skills</p>
+    </div>
+  </div>
+
+  <div class="container browse-layout">
+    <aside class="filter-sidebar">
+      <div class="filter-card">
+        <h3 class="filter-title">🔍 Filters</h3>
+        <div class="form-group">
+          <label>Search</label>
+          <input type="search" id="searchInput" placeholder="Search jobs…" />
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="catFilter">
+            <option>All Categories</option>
+            <option>Electrical</option><option>Plumbing</option><option>Cleaning</option>
+            <option>Handyman</option><option>Gardening</option><option>Tutoring</option>
+            <option>Cook/Maid</option><option>Pest Control</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Location</label>
+          <select id="locFilter">
+            <option>All Locations</option>
+            <option>Bangalore</option><option>Mumbai</option><option>Delhi NCR</option>
+            <option>Hyderabad</option><option>Chennai</option><option>Pune</option>
+            <option>Kolkata</option><option>Meerut</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-full" onclick="clearFilters()">Clear All Filters</button>
+      </div>
+    </aside>
+
+    <div>
+      <div class="jobs-toolbar">
+        <span id="jobCount" class="jobs-count">Loading…</span>
+        <div class="sort-bar">
+          <label>Sort:</label>
+          <select id="sortBy">
+            <option value="newest">Newest First</option>
+            <option value="budget-high">Budget: High → Low</option>
+            <option value="budget-low">Budget: Low → High</option>
+            <option value="apps">Most Applications</option>
+          </select>
+        </div>
+      </div>
+      <div id="jobsGrid" class="jobs-grid">
+        <p class="text-muted">Loading jobs…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apply Modal -->
+  <div id="applyModal" class="modal-overlay hidden" onclick="LC.utils.closeModalIfBg(event,'applyModal')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Apply for this Job</h3>
+        <button class="modal-close" onclick="LC.utils.closeModal('applyModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="applyJobInfo" style="background:var(--bg-muted);border-radius:var(--radius-sm);padding:.9rem 1rem;margin-bottom:1rem;font-size:.875rem"></div>
+        <div class="form-group">
+          <label>Your Proposal *</label>
+          <textarea id="applyProposal" rows="6" placeholder="Explain why you're the perfect fit — your experience, approach, and availability…"></textarea>
+        </div>
+        <div id="applyError" class="form-error hidden"></div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" onclick="LC.utils.closeModal('applyModal')">Cancel</button>
+          <button class="btn btn-primary" onclick="LC.utils.submitApply()">Submit Application</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="../js/api.js"></script>
+  <script>
+    window.onApplySuccess = () => renderJobs();
+
+    let appliedJobIds = [];
+    let debounceTimer;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      LC.nav.inject('browse');
+
+      // Pre-fill category from URL ?cat=
+      const params = new URLSearchParams(location.search);
+      const cat = params.get('cat');
+      if (cat) {
+        const sel = document.getElementById('catFilter');
+        for (let o of sel.options) {
+          if (o.value === cat || o.text === cat) { sel.value = o.value; break; }
+        }
+      }
+
+      // Load worker's applied jobs for "Applied ✓" badge
+      const user = LC.store.currentUser;
+      if (user && user.role === 'worker') {
+        try {
+          const apps = await LC.store.getApplications({ applicantId: user.id });
+          appliedJobIds = apps.map(a => a.jobId);
+        } catch (e) { /* not critical */ }
+      }
+
+      // Wire up filter listeners
+      document.getElementById('searchInput').addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(renderJobs, 350);
+      });
+      document.getElementById('catFilter').addEventListener('change', renderJobs);
+      document.getElementById('locFilter').addEventListener('change', renderJobs);
+      document.getElementById('sortBy').addEventListener('change', renderJobs);
+
+      renderJobs();
+    });
+
+    async function renderJobs() {
+      const q    = document.getElementById('searchInput').value.trim();
+      const cat  = document.getElementById('catFilter').value;
+      const loc  = document.getElementById('locFilter').value;
+      const sort = document.getElementById('sortBy').value;
+
+      const filters = { status: 'open', sort };
+      if (q)                              filters.q        = q;
+      if (cat !== 'All Categories')       filters.category = cat;
+      if (loc !== 'All Locations')        filters.location = loc;
+
+      const grid = document.getElementById('jobsGrid');
+      grid.innerHTML = '<p class="text-muted">Loading…</p>';
+
+      try {
+        const jobs = await LC.store.getJobs(filters);
+
+        // Fetch poster names (cache to avoid duplicate requests)
+        const userCache = {};
+        await Promise.all(
+          [...new Set(jobs.map(j => j.postedBy))].map(async uid => {
+            userCache[uid] = await LC.store.getUser(uid);
+          })
+        );
+        jobs.forEach(j => { j.posterName = userCache[j.postedBy]?.fullName || 'Unknown'; });
+
+        document.getElementById('jobCount').textContent =
+          `${jobs.length} job${jobs.length !== 1 ? 's' : ''} found`;
+
+        if (!jobs.length) {
+          grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+            <div class="empty-icon">🔍</div>
+            <p>No jobs match your filters. Try adjusting the search criteria.</p>
+            <button class="btn btn-outline" onclick="clearFilters()">Clear Filters</button>
+          </div>`;
+          return;
+        }
+
+        grid.innerHTML = jobs
+          .map(j => LC.utils.renderJobCard(j, { showApply: true, appliedJobIds }))
+          .join('');
+
+      } catch (err) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-icon">⚠️</div>
+          <p>Error loading jobs: ${err.message}</p>
+          <button class="btn btn-outline" onclick="renderJobs()">Try Again</button>
+        </div>`;
+      }
+    }
+
+    function clearFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('catFilter').value   = 'All Categories';
+      document.getElementById('locFilter').value   = 'All Locations';
+      document.getElementById('sortBy').value      = 'newest';
+      renderJobs();
+    }
+  </script>
+</body>
+</html>
