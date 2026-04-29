@@ -15,4 +15,4 @@ LocalConnect is a web-based platform that connects workers and job providers loc
 4. Open index.html
 
 ## Author
-Arnav Singh
+Arnav Singh, Ritik kumar, Manya Maheshwari, Sakshi Choudhary
